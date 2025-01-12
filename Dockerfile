@@ -21,5 +21,8 @@ EXPOSE 4000
 # Copy the rest of the application files
 COPY . .
 
-# Set the command to run the Phoenix app
+# Precompile the Phoenix assets (if any)
+RUN mix phx.digest
+
+# Set the command to run the Phoenix app in production mode
 CMD ["mix", "phx.server"]
