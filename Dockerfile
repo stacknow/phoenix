@@ -1,7 +1,15 @@
 # Stage 1: Build
-FROM elixir:1.15-alpine AS build
+FROM elixir:1.15-slim AS build
 
-RUN apk add --no-cache build-base git nodejs npm yarn openssl
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    git \
+    curl \
+    nodejs \
+    npm \
+    && apt-get clean
+
+RUN npm install -g yarn
 
 ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
@@ -18,20 +26,25 @@ RUN mix assets.deploy
 RUN mix compile
 RUN mix release
 
-# Debugging step to verify release directory
-RUN echo "Contents of /app/_build/prod:" && ls -l /app/_build/prod
-RUN echo "Contents of /app/_build/prod/rel:" && ls -l /app/_build/prod/rel
+# Debug to verify the release directory
+RUN echo "Contents of /app/_build/prod/rel/hello_world:" && ls -l /app/_build/prod/rel/hello_world
 
 # Stage 2: Release
-FROM alpine:latest AS app
+FROM debian:bookworm-slim AS app
 
-RUN apk add --no-cache openssl ncurses-libs bash
+RUN apt-get update && apt-get install -y \
+    bash \
+    openssl \
+    libncurses5 \
+    libncursesw5 \
+    libstdc++6 \
+    libsystemd0 \
+    && apt-get clean
 
 ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 
-# Use the correct app name in the COPY step
-COPY --from=build /app/_build/prod/rel/hello_world ./ 
+COPY --from=build /app/_build/prod/rel/hello_world ./
 
 EXPOSE 4000
 CMD ["bin/hello_world", "start"]
