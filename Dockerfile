@@ -8,6 +8,9 @@ RUN apk update && \
 # Set the working directory inside the container
 WORKDIR /app
 
+# Install Hex package manager
+RUN mix local.hex --force
+
 # Copy the mix.exs and mix.lock files first (to leverage caching)
 COPY mix.exs mix.lock ./
 
