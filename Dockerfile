@@ -1,63 +1,37 @@
 # Stage 1: Build
 FROM elixir:1.15-alpine AS build
 
-# Install required packages
-RUN apk add --no-cache \
-    build-base \
-    git \
-    nodejs \
-    npm \
-    yarn \
-    openssl
+RUN apk add --no-cache build-base git nodejs npm yarn openssl
 
-# Set environment variables
-ENV MIX_ENV=prod \
-    LANG=C.UTF-8 \
-    APP_NAME=my_app
-
-# Create and set the working directory
+ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 
-# Copy and fetch dependencies
 COPY mix.exs mix.lock ./
+COPY config config
 RUN mix local.hex --force && mix local.rebar --force && mix deps.get --only prod
 
-# Install and build assets using esbuild
-COPY assets/package.json assets/yarn.lock ./assets/
+COPY assets assets
 RUN cd assets && yarn install --frozen-lockfile
-COPY assets ./assets
-RUN mix assets.deploy
 
-# Copy application source code
 COPY . .
-
-# Compile and build the release
+RUN mix assets.deploy
 RUN mix compile
 RUN mix release
+
+# Debugging step to verify release directory
+RUN echo "Contents of /app/_build/prod:" && ls -l /app/_build/prod
+RUN echo "Contents of /app/_build/prod/rel:" && ls -l /app/_build/prod/rel
 
 # Stage 2: Release
 FROM alpine:latest AS app
 
-# Install runtime dependencies
-RUN apk add --no-cache \
-    openssl \
-    ncurses-libs \
-    bash
+RUN apk add --no-cache openssl ncurses-libs bash
 
-# Set environment variables
-ENV HOME=/app \
-    MIX_ENV=prod \
-    LANG=C.UTF-8 \
-    APP_NAME=my_app
-
-# Create a directory for the application
+ENV MIX_ENV=prod LANG=C.UTF-8
 WORKDIR /app
 
-# Copy the release from the build stage
-COPY --from=build /app/_build/prod/rel/$APP_NAME ./
+# Use the correct app name in the COPY step
+COPY --from=build /app/_build/prod/rel/hello_world ./ 
 
-# Expose the default Phoenix port
 EXPOSE 4000
-
-# Command to start the application
-CMD ["bin/my_app", "start"]
+CMD ["bin/hello_world", "start"]
