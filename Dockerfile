@@ -1,43 +1,63 @@
-# Step 1: Set up the build environment
-FROM elixir:1.14-alpine AS build
+# Stage 1: Build
+FROM elixir:1.15-alpine AS build
 
-# Install necessary dependencies
-RUN apk update && \
-    apk add --no-cache build-base nodejs npm git
+# Install required packages
+RUN apk add --no-cache \
+    build-base \
+    git \
+    nodejs \
+    npm \
+    yarn \
+    openssl
 
-# Set the working directory inside the container
+# Set environment variables
+ENV MIX_ENV=prod \
+    LANG=C.UTF-8 \
+    APP_NAME=my_app
+
+# Create and set the working directory
 WORKDIR /app
 
-# Install Hex package manager
-RUN mix local.hex --force
-
-# Copy the mix.exs and mix.lock files first (to leverage caching)
+# Copy and fetch dependencies
 COPY mix.exs mix.lock ./
+RUN mix local.hex --force && mix local.rebar --force && mix deps.get --only prod
 
-# Fetch dependencies
-RUN mix deps.get
+# Install and build assets using esbuild
+COPY assets/package.json assets/yarn.lock ./assets/
+RUN cd assets && yarn install --frozen-lockfile
+COPY assets ./assets
+RUN mix assets.deploy
 
-# Copy the rest of the application code
+# Copy application source code
 COPY . .
 
-# Compile the application
-RUN mix assets.deploy
-RUN MIX_ENV=prod mix release
+# Compile and build the release
+RUN mix compile
+RUN mix release
 
-# Step 2: Set up the production environment
-FROM elixir:1.14-alpine AS runtime
+# Stage 2: Release
+FROM alpine:latest AS app
 
-# Install necessary runtime dependencies
-RUN apk add --no-cache libstdc++ ncurses-libs
+# Install runtime dependencies
+RUN apk add --no-cache \
+    openssl \
+    ncurses-libs \
+    bash
 
-# Set the working directory
+# Set environment variables
+ENV HOME=/app \
+    MIX_ENV=prod \
+    LANG=C.UTF-8 \
+    APP_NAME=my_app
+
+# Create a directory for the application
 WORKDIR /app
 
-# Copy the built release from the build stage
-COPY --from=build /app/_build/prod/rel/phoenix .
+# Copy the release from the build stage
+COPY --from=build /app/_build/prod/rel/$APP_NAME ./
 
-# Expose the port that the Phoenix app runs on
+# Expose the default Phoenix port
 EXPOSE 4000
 
-# Run the Phoenix application
-CMD ["bin/phoenix", "start"]
+# Command to start the application
+CMD ["bin/my_app", "start"]
