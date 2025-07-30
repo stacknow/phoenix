@@ -1,0 +1,14 @@
+# Elixir and Phoenix
+/_build
+/deps
+/priv/static
+/priv/gettext
+/.elixir_ls
+/.iex-history
+/.mix
+# node_modules (if using JS assets)
+node_modules
+/assets/node_modules
+# Phoenix specific
+*.log
+*.beam
